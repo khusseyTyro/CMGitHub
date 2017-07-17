@@ -1,0 +1,149 @@
+<html>
+<head>
+    <title>CM JS dev, requirement 6</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.10/handlebars.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.18.1/moment.min.js"></script>
+    <link href="css/bootstrap.min.css" rel="stylesheet" media="screen">
+
+    <script>
+        var closedRowTemplate;
+        var openRowTemplate;
+        $(document).ready(function () {
+            $("#displayClosed").click(getClosedRequests);
+            $("#displayOpen").click(getOpenRequests);
+            closedRowTemplate = Handlebars.compile($('#closed-result-template').html());
+            openRowTemplate = Handlebars.compile($('#open-result-template').html());
+
+            Handlebars.registerHelper('timeAgo', function (date) {
+                return moment(date).format("DD/MM/YYYY");
+            });
+        });
+
+        function getClosedRequests() {
+            $(".resultsTable").hide();
+            $.ajax({
+                url: "https://api.github.com/repos/kevhussey/testcm/pulls?state=closed",
+                success: function (data) {
+                    $("#closedResultsTable").show();
+                    $("#closedResultBody").empty();
+                    $.each(data, function (i, item) {
+                        renderClosedRequest(item);
+                    });
+                },
+                error: function (XHR, textStatus, errorThrown) {
+                    console.log("ajax error");
+                }
+            });
+        }
+
+        function getOpenRequests() {
+            $(".resultsTable").hide();
+            setSystemMessage(infoClass, "Retreiving open pull requests ...");
+            $.ajax({
+                url: "https://api.github.com/repos/kevhussey/testcm/pulls?state=open",
+                success: function (data) {
+                    setSystemMessage(infoClass, "Open pull requests received");
+                    $("#openResultsTable").show();
+                    $("#openResultBody").empty();
+                    $.each(data, function (i, item) {
+                        renderOpenRequest(item);
+                    });
+                },
+                error: function (XHR, textStatus, errorThrown) {
+                    setSystemMessage(errorClass, "Error retrieving pull requests");
+                }
+            });
+        }
+
+        function merge(number) {
+            $.ajax({
+                url: "https://api.github.com/repos/kevhussey/testcm/pulls/" + number + "/merge",
+//                beforeSend: function (request) {
+//                    request.setRequestHeader("Authorization", "Basic xxxx");
+//                },
+                beforeSend: function (request) {
+                    request.setRequestHeader("Authorization", "Basic " + btoa("kevhussey:XXXXXX"));
+                },
+                method: "PUT",
+                success: function (data) {
+                    setSystemMessage(successClass, "Pull request merged successfully.");
+                    ${"#merge-open-"+number}.empty();
+                },
+                error: function (XHR, textStatus, errorThrown) {
+                    setSystemMessage(errorClass, "Error merging pull request.")
+                }
+            });
+        }
+
+        function renderClosedRequest(request) {
+            var renderRequest = closedRowTemplate(request);
+            $(renderRequest).appendTo($('#closedResultBody'));
+        }
+
+        function renderOpenRequest(request) {
+            var renderRequest = openRowTemplate(request);
+            $(renderRequest).appendTo($('#openResultBody'));
+        }
+
+        var successClass = "alert-success";
+        var errorClass = "alert-danger";
+        var infoClass = "alert-info";
+        function setSystemMessage(classStyle, text) {
+            $("#system-message").removeClass("alert-danger alert-info alert-success").addClass(classStyle);
+            $("#system-message").html(text).show();
+            setTimeout(function(){ $("#system-message").slideUp() }, 2000);
+        }
+
+    </script>
+</head>
+<body>
+<div class="container">
+    <h1>GitHub Front-end</h1>
+    <button id="displayClosed" type="button" class="btn btn-primary">Display list of closed pull request</button>
+    <button id="displayOpen" type="button" class="btn btn-primary">Display list of open pull request</button>
+    <div id="system-message" class="alert alert-danger alert-dismissable" style="display: none">
+    </div>
+    <table id="closedResultsTable" class="table table-striped resultsTable" style="display: none">
+        <thead>
+        <tr>
+            <th>Title</th>
+            <th>Closed date</th>
+        </tr>
+        </thead>
+        <tbody id="closedResultBody">
+        <script id="closed-result-template" type="text/x-handlebars-template">
+            <tr>
+                <td>{{title}}</td>
+                <td>{{timeAgo closed_at}}</td>
+            </tr>
+        </script>
+        </tbody>
+    </table>
+    <br/>
+
+    <table id="openResultsTable" class="table table-striped resultsTable" style="display: none">
+        <thead>
+        <tr>
+            <th>Title</th>
+            <th>Created date</th>
+            <th>Updated date</th>
+            <th>Action</th>
+        </tr>
+        </thead>
+        <tbody id="openResultBody">
+        <script id="open-result-template" type="text/x-handlebars-template">
+            <tr id="merge-open-{{number}}">
+                <td>{{title}}</td>
+                <td>{{timeAgo created_at}}</td>
+                <td>{{timeAgo updated_at}}</td>
+                <td onclick="merge('{{number}}')">
+                    <button type="button" class="btn btn-primary">Merge</button>
+                </td>
+            </tr>
+        </script>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>
